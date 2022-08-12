@@ -45,6 +45,7 @@ import java.util.Set;
 public class Yield4Android extends View implements com.xebisco.yield.render.RenderMaster, ExceptionThrower {
 
     private RectF rect = new RectF(0, 0, 0, 0);
+    public static final String version = "v0.0.1";
     private Rect textBounds = new Rect();
     private final Paint paint = new Paint();
     private com.xebisco.yield.View view;
