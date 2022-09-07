@@ -2,6 +2,7 @@ package com.xebisco.yield4android;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.res.AssetFileDescriptor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -26,6 +27,7 @@ import com.xebisco.yield.SampleGraphics;
 import com.xebisco.yield.SampleWindow;
 import com.xebisco.yield.Texture;
 import com.xebisco.yield.Vector2;
+import com.xebisco.yield.Yld;
 import com.xebisco.yield.YldB;
 import com.xebisco.yield.YldGame;
 import com.xebisco.yield.YldPair;
@@ -45,7 +47,7 @@ import java.util.Set;
 public class Yield4Android extends View implements com.xebisco.yield.render.RenderMaster, ExceptionThrower {
 
     private RectF rect = new RectF(0, 0, 0, 0);
-    public static final String version = "v0.0.1";
+    public static final String version = "v0.0.2";
     private Rect textBounds = new Rect();
     private final Paint paint = new Paint();
     private com.xebisco.yield.View view;
@@ -382,13 +384,13 @@ public class Yield4Android extends View implements com.xebisco.yield.render.Rend
     public void fileFromRelativeFile(RelativeFile relativeFile, File file) {
         try {
             OutputStream outStream = new FileOutputStream(file);
+            if (relativeFile.getInputStream() == null)
+                relativeFile.setInputStream(getContext().getAssets().open(relativeFile.getCachedPath()));
             byte[] buffer = new byte[8 * 1024];
             int bytesRead;
             while ((bytesRead = relativeFile.getInputStream().read(buffer)) != -1) {
                 outStream.write(buffer, 0, bytesRead);
             }
-            if (relativeFile.isFlushAfterLoad())
-                relativeFile.flush();
             if (relativeFile.isFlushAfterLoad())
                 relativeFile.flush();
             outStream.close();
@@ -499,18 +501,24 @@ public class Yield4Android extends View implements com.xebisco.yield.render.Rend
     @Override
     public void loadAudioClip(AudioClip audioClip, AudioPlayer audioPlayer, MultiThread multiThread, YldB yldB) {
         try {
-            File file = File.createTempFile("tempaclip", "tmp");
-            fileFromRelativeFile(audioClip, file);
-            if (audioClip.isFlushAfterLoad())
-                audioClip.flush();
-            MediaPlayer player = MediaPlayer.create(getContext(), Uri.fromFile(file));
+            AssetFileDescriptor afd = assetFileDescriptorFromRelativeFile(audioClip);
+            MediaPlayer player = new MediaPlayer();
+            player.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
             player.prepare();
-            player.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).build());
             player.setVolume(1f, 1f);
             mediaPlayers.put(audioPlayer.getPlayerID(), new YldPair<>(player, 1f));
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public AssetFileDescriptor assetFileDescriptorFromRelativeFile(RelativeFile relativeFile) {
+        try {
+            return getContext().getAssets().openFd(relativeFile.getCachedPath());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     @Override
