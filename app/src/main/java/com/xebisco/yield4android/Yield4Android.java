@@ -1,5 +1,7 @@
 package com.xebisco.yield4android;
 
+import static androidx.constraintlayout.helper.widget.MotionEffect.TAG;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
@@ -12,9 +14,8 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
-import android.media.AudioAttributes;
 import android.media.MediaPlayer;
-import android.net.Uri;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -27,13 +28,14 @@ import com.xebisco.yield.SampleGraphics;
 import com.xebisco.yield.SampleWindow;
 import com.xebisco.yield.Texture;
 import com.xebisco.yield.Vector2;
-import com.xebisco.yield.Yld;
+import com.xebisco.yield.Vector3;
 import com.xebisco.yield.YldB;
 import com.xebisco.yield.YldGame;
 import com.xebisco.yield.YldPair;
 import com.xebisco.yield.config.WindowConfiguration;
 import com.xebisco.yield.exceptions.NotSupportedException;
 import com.xebisco.yield.render.ExceptionThrower;
+import com.xebisco.yield.render.MultipleFingerPointers;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -44,7 +46,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public class Yield4Android extends View implements com.xebisco.yield.render.RenderMaster, ExceptionThrower {
+public class Yield4Android extends View implements com.xebisco.yield.render.RenderMaster, ExceptionThrower, MultipleFingerPointers {
 
     private RectF rect = new RectF(0, 0, 0, 0);
     public static final String version = "v0.0.2";
@@ -59,6 +61,7 @@ public class Yield4Android extends View implements com.xebisco.yield.render.Rend
     private Map<String, YldPair<Typeface, Float>> typefaces = new HashMap<>();
     private Set<Integer> keys = new HashSet<>();
     private Map<Integer, YldPair<MediaPlayer, Float>> mediaPlayers = new HashMap<>();
+    private final Set<Vector3> fingerPointers = new HashSet<>();
     private long actual, last;
     private float lMouseX, lMouseY, fps;
 
@@ -88,8 +91,41 @@ public class Yield4Android extends View implements com.xebisco.yield.render.Rend
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         performClick();
-        lMouseX = (float) view.getWidth() / (float) getWidth() * event.getX();
-        lMouseY = (float) view.getHeight() / (float) getHeight() * event.getY();
+        final int points = event.getPointerCount();
+
+        // Check if it's an event that a finger
+        // was removed, if so, set removedPoint
+        int removedPoint = -1;
+        final int action = event.getAction() & MotionEvent.ACTION_MASK;
+
+        if(action == MotionEvent.ACTION_POINTER_UP || action == MotionEvent.ACTION_UP)
+            removedPoint = 0;
+
+
+        StringBuilder out = new StringBuilder();
+
+        fingerPointers.clear();
+
+        for(int i = 0; i < points; i++){
+            // Find out pointer ID
+            int pointerID = event.getPointerId(i);
+            if(pointerID == MotionEvent.INVALID_POINTER_ID){
+                out.append("\tPoint ").append(pointerID).append(" INVALID\n");
+                continue;
+            }
+
+            // Check if it's the removed finger
+            if(removedPoint == i){
+                out.append("\tPoint ").append(pointerID).append(" REMOVED\n");
+                continue;
+            }
+
+            out.append("\tPoint ").append(pointerID).append("\t(").append(event.getX(i)).append(", ").append(event.getY(i)).append(")\n");
+            fingerPointers.add(new Vector3(event.getX(i), event.getY(i), pointerID));
+        }
+
+        Log.i(TAG, out.toString());
+
         return true;
     }
 
@@ -750,5 +786,9 @@ public class Yield4Android extends View implements com.xebisco.yield.render.Rend
 
     public void setFps(float fps) {
         this.fps = fps;
+    }
+    @Override
+    public Set<Vector3> fingerPointers() {
+        return fingerPointers;
     }
 }
